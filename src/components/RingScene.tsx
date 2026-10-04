@@ -24,7 +24,7 @@ export default function RingScene() {
     const scene = new THREE.Scene();
     const environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04);
     scene.environment = environment.texture;
-    const camera = new THREE.PerspectiveCamera(window.innerWidth < 700 ? 65 : 25, 1, .01, 100);
+    const camera = new THREE.PerspectiveCamera(window.innerWidth < 700 ? 65 : window.innerWidth / window.innerHeight < 1.1 ? 44 : 25, 1, .01, 100);
     camera.position.set(3, -.8, 1.2);
     const target = new THREE.Vector3(2.5, -.07, -.1);
     scene.add(new THREE.AmbientLight(0xffffff, 2.6));
@@ -66,7 +66,7 @@ export default function RingScene() {
       const width = window.innerWidth; const height = window.innerHeight;
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
-      camera.fov = width < 700 ? 65 : 25;
+      camera.fov = width < 700 ? 65 : width / height < 1.1 ? 44 : 25;
       camera.updateProjectionMatrix();
     }
     resize();
