@@ -49,7 +49,7 @@ export default function RingScene() {
         if (!(object instanceof THREE.Mesh)) return;
         const name = object.name.toLowerCase();
         if (name.includes('diamond')) {
-          const material = new THREE.MeshPhysicalMaterial({ color: 0xd8e8ff, metalness: .05, roughness: .055, transmission: .12, thickness: .35, ior: 2.2, clearcoat: 1, clearcoatRoughness: 0, envMapIntensity: 2, side: THREE.DoubleSide });
+          const material = new THREE.MeshPhysicalMaterial({ color: 0xd8e8ff, metalness: .05, roughness: .055, clearcoat: 1, clearcoatRoughness: 0, envMapIntensity: 2, side: THREE.DoubleSide });
           object.material = material;
         } else if (name.includes('gold')) {
           object.material = new THREE.MeshPhysicalMaterial({ color: 0xc7976f, metalness: .82, roughness: .12, clearcoat: 1, side: THREE.DoubleSide });
@@ -86,16 +86,12 @@ export default function RingScene() {
         if (window.innerWidth < 700) { t.x -= 1.12 * (1 - a); t.y += 1.5 * a * (1 - b); }
         camera.position.lerp(p, .055);
         target.lerp(t, .055);
-        const rotation = new THREE.Euler(0, 0, 0).setFromVector3(new THREE.Vector3(0, 0, 0));
-        const rx = THREE.MathUtils.lerp(0, 0, a);
-        rotation.set(THREE.MathUtils.lerp(rx, 0, b), 0, THREE.MathUtils.lerp(0, Math.PI / 2, a) * (1 - b) - b * Math.PI / 2);
-        ring.rotation.x = THREE.MathUtils.damp(ring.rotation.x, rotation.x, 4, clock.getDelta());
-        ring.rotation.z = THREE.MathUtils.lerp(ring.rotation.z, rotation.z, .045);
-        motion.color = a * (1 - b);
+        ring.rotation.z = THREE.MathUtils.lerp(ring.rotation.z, Math.PI / 2 * a * (1 - b) - b * Math.PI / 2, .045);
+        const color = a * (1 - b);
         ring.traverse((object) => {
           if (!(object instanceof THREE.Mesh) || !object.name.toLowerCase().includes('diamond')) return;
           const material = object.material;
-          if (material instanceof THREE.MeshPhysicalMaterial) material.color.lerpColors(new THREE.Color(0xd8e8ff), new THREE.Color(0x66d5ff), motion.color);
+          if (material instanceof THREE.MeshPhysicalMaterial) material.color.lerpColors(new THREE.Color(0xd8e8ff), new THREE.Color(0x66d5ff), color);
         });
       }
       camera.lookAt(target);
