@@ -19,6 +19,9 @@
  */
 
 @theme inline {
+  --font-body: "Archivo", sans-serif;
+  --font-display: "Playfair Display SC", serif;
+  --font-script: "Qwitcher Grypen", cursive;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -62,26 +65,26 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
+  --radius: 0.5rem;
+  --background: oklch(0.827 0.067 17);
+  --foreground: oklch(0.357 0.047 39);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.357 0.047 39);
+  --primary-foreground: oklch(0.96 0.024 17);
   --secondary: oklch(0.968 0.007 247.896);
   --secondary-foreground: oklch(0.208 0.042 265.755);
   --muted: oklch(0.968 0.007 247.896);
   --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
+  --accent: oklch(0.7 0.082 25);
+  --accent-foreground: oklch(0.495 0.111 28);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --border: oklch(0.357 0.047 39);
+  --input: oklch(0.357 0.047 39);
+  --ring: oklch(0.495 0.111 28);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -140,5 +143,47 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-body);
   }
 }
+
+.jewelry-page { min-height: 300svh; background: var(--color-background); overflow: clip; }
+.jewelry-canvas { position: fixed; inset: 0; width: 100%; height: 100svh; z-index: 1; pointer-events: none; }
+.jewelry-header { position: fixed; top: 0; left: 0; right: 0; z-index: 5; display: flex; justify-content: space-between; align-items: center; width: 80%; margin: 0 auto; padding-top: 36px; }
+.jewelry-brand { display: flex; align-items: baseline; gap: 10px; font-size: 19px; font-weight: 200; white-space: nowrap; }
+.jewelry-brand small { font-size: 10px; }
+.jewelry-navigation { display: flex; align-items: center; gap: 22px; }
+.jewelry-copy { position: fixed; z-index: 3; top: 50%; right: 15%; width: min(35%, 480px); transform: translateY(-50%); text-align: right; pointer-events: none; }
+.jewelry-copy > * { pointer-events: auto; }
+.jewelry-title { font-family: var(--font-display); font-weight: 400; font-size: clamp(66px, 6.2vw, 110px); line-height: .85; text-transform: uppercase; margin-bottom: 25px; }
+.jewelry-description { font-size: 11px; font-weight: 300; line-height: 1.8; max-width: 410px; margin: 0 0 22px auto; }
+.jewelry-cta { display: flex; justify-content: flex-end; }
+.jewelry-cta-circle { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; }
+.jewelry-scroll { position: fixed; z-index: 4; left: 50%; bottom: 30px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 9px; }
+.jewelry-scroll svg { animation: jewelry-bounce 2s infinite; }
+.jewelry-dots { position: fixed; z-index: 5; right: 3%; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 11px; }
+.jewelry-dot { width: 5px; height: 5px; padding: 0; border-radius: 50%; background: var(--color-primary-foreground); opacity: .6; transition: transform .3s, opacity .3s; }
+.jewelry-dot[data-active="true"] { transform: scale(1.35); opacity: 1; }
+.jewelry-secondary { position: fixed; z-index: 3; top: 50%; left: 15%; width: min(30%, 360px); transform: translateY(-50%); pointer-events: none; }
+.jewelry-secondary h2 { font-family: var(--font-display); font-size: clamp(66px, 6.2vw, 110px); font-weight: 400; line-height: .8; margin-bottom: 30px; }
+.jewelry-secondary .script { font-family: var(--font-script); font-size: 52px; line-height: .8; padding-left: 65px; }
+.jewelry-secondary p { font-size: 11px; font-weight: 300; line-height: 1.8; }
+.jewelry-secondary button { pointer-events: auto; margin-top: 22px; }
+.jewelry-backword { position: absolute; z-index: -1; font-family: var(--font-script); font-size: clamp(160px, 35vw, 520px); opacity: .09; white-space: nowrap; top: 50%; left: -12%; transform: translateY(-50%); pointer-events: none; }
+.jewelry-spacer { height: 100svh; }
+@keyframes jewelry-bounce { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } 60% { transform: translateY(-4px); } }
+@media (max-width: 700px) {
+  .jewelry-header { width: 88%; padding-top: 24px; justify-content: center; }
+  .jewelry-brand { font-size: 17px; }
+  .jewelry-navigation, .jewelry-dots { display: none; }
+  .jewelry-copy { top: 17%; left: 5%; right: 5%; width: 90%; transform: none; text-align: center; }
+  .jewelry-title { font-size: clamp(47px, 13vw, 75px); margin-bottom: 0; }
+  .jewelry-description { position: fixed; top: calc(100svh - 177px); left: 5%; width: 90%; margin: 0; text-align: center; }
+  .jewelry-cta { position: fixed; top: calc(100svh - 108px); left: 0; right: 0; justify-content: center; }
+  .jewelry-scroll { bottom: 12px; }
+  .jewelry-scroll span { display: none; }
+  .jewelry-secondary { top: 16%; left: 5%; width: 90%; transform: none; text-align: center; }
+  .jewelry-secondary h2 { font-size: 70px; }
+  .jewelry-secondary p { position: fixed; top: calc(100svh - 160px); left: 5%; width: 90%; }
+}
+@media (prefers-reduced-motion: reduce) { .jewelry-scroll svg { animation: none; } }
