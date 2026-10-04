@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import gsap from 'gsap';
 import ringAsset from '@/assets/ring_webgi.glb.asset.json';
 
@@ -16,11 +17,13 @@ export default function RingScene() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.55;
     const scene = new THREE.Scene();
+    const environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04);
+    scene.environment = environment.texture;
     const camera = new THREE.PerspectiveCamera(window.innerWidth < 700 ? 65 : 25, 1, .01, 100);
     camera.position.set(3, -.8, 1.2);
     const target = new THREE.Vector3(2.5, -.07, -.1);
@@ -36,12 +39,12 @@ export default function RingScene() {
     let ring: THREE.Object3D | undefined;
     let disposed = false;
     let intro: gsap.core.Timeline | undefined;
-    const motion = { x: 0, y: 0, z: 0, color: 0 };
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     loader.load(ringAsset.url, (gltf) => {
       if (disposed) return;
       ring = gltf.scene;
       scene.add(ring);
+      window.dispatchEvent(new Event('jewelry-ready'));
       ring.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
         const name = object.name.toLowerCase();
@@ -54,7 +57,7 @@ export default function RingScene() {
           object.material = new THREE.MeshPhysicalMaterial({ color: 0xd6c9d6, metalness: .82, roughness: .1, clearcoat: 1, side: THREE.DoubleSide });
         }
       });
-      intro = gsap.timeline({ onComplete: () => window.dispatchEvent(new Event('jewelry-ready')) });
+      intro = gsap.timeline();
       intro.to(camera.position, { x: hero.position.x, y: hero.position.y, z: hero.position.z, duration: reduced ? .01 : 4, ease: 'power2.inOut' }, 0)
         .to(target, { x: window.innerWidth < 700 ? -.21 : hero.target.x, y: hero.target.y, z: hero.target.z, duration: reduced ? .01 : 4, ease: 'power2.inOut' }, 0);
     }, undefined, (error) => { console.error('Ring failed to load', error); window.dispatchEvent(new Event('jewelry-ready')); });
@@ -68,7 +71,6 @@ export default function RingScene() {
     }
     resize();
     window.addEventListener('resize', resize);
-    const clock = new THREE.Clock();
     let frame = 0;
     let scroll = 0;
     const onScroll = () => { scroll = window.scrollY / Math.max(window.innerHeight, 1); };
