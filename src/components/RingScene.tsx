@@ -9,6 +9,12 @@ import ringAsset from '@/assets/ring_webgi.glb.asset.json';
 const hero = { position: new THREE.Vector3(1.28, -1.7, 5.86), target: new THREE.Vector3(.91, .03, -.25) };
 const forever = { position: new THREE.Vector3(-1.83, -.14, 6.15), target: new THREE.Vector3(-.78, -.03, -.12) };
 const emotions = { position: new THREE.Vector3(-.06, -1.15, 4.42), target: new THREE.Vector3(-.01, .9, .07) };
+const diamondWhite = new THREE.Color(0xffffff);
+const diamondBlue = new THREE.Color(0x39cffe);
+const diamondPink = new THREE.Color(0xf70db1);
+const metalSilver = new THREE.Color(0xfefefe);
+const metalRose = new THREE.Color(0xd28b8b);
+const metalGold = new THREE.Color(0xf7c478);
 
 export default function RingScene() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -49,7 +55,7 @@ export default function RingScene() {
         if (!(object instanceof THREE.Mesh)) return;
         const name = object.name.toLowerCase();
         if (name.includes('diamond')) {
-          const material = new THREE.MeshPhysicalMaterial({ color: 0xd8e8ff, metalness: .05, roughness: .055, clearcoat: 1, clearcoatRoughness: 0, envMapIntensity: 2, side: THREE.DoubleSide });
+          const material = new THREE.MeshPhysicalMaterial({ color: diamondWhite, metalness: .05, roughness: .055, clearcoat: 1, clearcoatRoughness: 0, envMapIntensity: 2, side: THREE.DoubleSide });
           object.material = material;
         } else if (name.includes('gold')) {
           object.material = new THREE.MeshPhysicalMaterial({ color: 0xc7976f, metalness: .82, roughness: .12, clearcoat: 1, side: THREE.DoubleSide });
@@ -86,12 +92,15 @@ export default function RingScene() {
         if (window.innerWidth < 700) { t.x -= 1.12 * (1 - a); t.y += 1.5 * a * (1 - b); }
         camera.position.lerp(p, .055);
         target.lerp(t, .055);
-        ring.rotation.z = THREE.MathUtils.lerp(ring.rotation.z, Math.PI / 2 * a * (1 - b) - b * Math.PI / 2, .045);
-        const color = a * (1 - b);
+        ring.rotation.y = THREE.MathUtils.lerp(ring.rotation.y, -Math.PI / 3 * a * (1 - b) + .92 * b, .045);
+        ring.rotation.x = THREE.MathUtils.lerp(ring.rotation.x, .92 * b, .045);
         ring.traverse((object) => {
-          if (!(object instanceof THREE.Mesh) || !object.name.toLowerCase().includes('diamond')) return;
+          if (!(object instanceof THREE.Mesh)) return;
           const material = object.material;
-          if (material instanceof THREE.MeshPhysicalMaterial) material.color.lerpColors(new THREE.Color(0xd8e8ff), new THREE.Color(0x66d5ff), color);
+          if (!(material instanceof THREE.MeshPhysicalMaterial)) return;
+          const name = object.name.toLowerCase();
+          if (name.includes('diamond')) material.color.lerpColors(diamondWhite, diamondBlue, a).lerp(diamondPink, b);
+          else if (name.includes('gold') || name.includes('silver')) material.color.lerpColors(metalSilver, metalRose, a).lerp(metalGold, b);
         });
       }
       camera.lookAt(target);
