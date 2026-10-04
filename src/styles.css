@@ -148,6 +148,7 @@
 }
 
 .jewelry-page { min-height: 300svh; background: var(--color-background); overflow: clip; }
+.jewelry-page[data-night="true"] { filter: invert(1); }
 .jewelry-canvas { position: fixed; inset: 0; width: 100%; height: 100svh; z-index: 1; pointer-events: none; }
 .jewelry-header { position: fixed; top: 0; left: 0; right: 0; z-index: 5; display: flex; justify-content: space-between; align-items: center; width: 80%; margin: 0 auto; padding-top: 36px; }
 .jewelry-brand { display: flex; align-items: baseline; gap: 10px; font-size: 19px; font-weight: 200; white-space: nowrap; }
@@ -176,10 +177,10 @@
   .jewelry-header { width: 88%; padding-top: 24px; justify-content: center; }
   .jewelry-brand { font-size: 17px; }
   .jewelry-navigation, .jewelry-dots { display: none; }
-  .jewelry-copy { top: 17%; left: 5%; right: 5%; width: 90%; transform: none; text-align: center; }
-  .jewelry-title { font-size: clamp(47px, 13vw, 75px); margin-bottom: 0; }
-  .jewelry-description { position: fixed; top: calc(100svh - 177px); left: 5%; width: 90%; margin: 0; text-align: center; }
-  .jewelry-cta { position: fixed; top: calc(100svh - 108px); left: 0; right: 0; justify-content: center; }
+  .jewelry-copy { top: 0; left: 5%; right: 5%; width: 90%; height: 100svh; transform: none; text-align: center; }
+  .jewelry-title { font-size: clamp(47px, 13vw, 75px); margin: 90px 0 0; }
+  .jewelry-description { position: absolute; bottom: 128px; left: 5%; width: 90%; margin: 0; text-align: center; }
+  .jewelry-cta { position: absolute; bottom: 52px; left: 0; right: 0; justify-content: center; }
   .jewelry-scroll { bottom: 12px; }
   .jewelry-scroll span { display: none; }
   .jewelry-secondary { top: 16%; left: 5%; width: 90%; transform: none; text-align: center; }

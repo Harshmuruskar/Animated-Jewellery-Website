@@ -18,7 +18,7 @@ export const Route = createFileRoute('/')({
 });
 
 function Index() {
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(true);
   const [section, setSection] = useState(0);
   const [muted, setMuted] = useState(true);
   const [night, setNight] = useState(false);
