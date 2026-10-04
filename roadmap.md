@@ -1,0 +1,3 @@
+- [ ] Recreate the reference hero appearance and animated 3D ring entrance.
+- [ ] Match the reference’s scroll-driven camera transitions and controls.
+- [ ] Check desktop and mobile rendering and interactions.
