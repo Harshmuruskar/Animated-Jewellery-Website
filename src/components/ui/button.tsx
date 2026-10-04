@@ -16,12 +16,15 @@ const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        jewelry: "border border-foreground bg-transparent text-foreground rounded-full font-light hover:border-accent-foreground hover:text-accent-foreground",
+        iconPlain: "bg-transparent text-foreground hover:text-accent-foreground",
       },
       size: {
         default: "h-9 px-4 py-2",
         sm: "h-8 rounded-md px-3 text-xs",
         lg: "h-10 rounded-md px-8",
         icon: "h-9 w-9",
+        jewelry: "h-11 pl-5 pr-2 gap-3",
       },
     },
     defaultVariants: {
