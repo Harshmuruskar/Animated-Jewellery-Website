@@ -84,7 +84,7 @@ export default function RingScene() {
     onScroll();
     function tick() {
       frame = requestAnimationFrame(tick);
-      if (ring && scroll > 0) {
+      if (ring && (scroll > 0 || (intro && !intro.isActive()))) {
         const a = THREE.MathUtils.clamp(scroll, 0, 1);
         const b = THREE.MathUtils.clamp(scroll - 1, 0, 1);
         const p = hero.position.clone().lerp(forever.position, a).lerp(emotions.position, b);
