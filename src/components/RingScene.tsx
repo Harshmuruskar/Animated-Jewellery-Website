@@ -92,8 +92,13 @@ export default function RingScene() {
         if (window.innerWidth < 700) { t.x -= 1.12 * (1 - a); t.y += 1.5 * a * (1 - b); }
         camera.position.lerp(p, .055);
         target.lerp(t, .055);
-        ring.rotation.y = THREE.MathUtils.lerp(ring.rotation.y, -Math.PI / 3 * a * (1 - b) + .92 * b, .045);
-        ring.rotation.x = THREE.MathUtils.lerp(ring.rotation.x, .92 * b, .045);
+        // Reference pose: tilt forward and left in Forever, then roll clockwise
+        // as the ring lifts into Emotions. All three Euler axes animate together.
+        ring.rotation.set(
+          THREE.MathUtils.lerp(-Math.PI / 3 * a, .92, b),
+          THREE.MathUtils.lerp(-.92 * a, .92, b),
+          Math.PI / 3 * b,
+        );
         ring.traverse((object) => {
           if (!(object instanceof THREE.Mesh)) return;
           const material = object.material;
