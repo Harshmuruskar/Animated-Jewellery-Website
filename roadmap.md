@@ -1,4 +1,4 @@
 - [x] Recreate the reference hero appearance and animated 3D ring entrance.
 - [x] Match the reference’s scroll-driven camera transitions and controls.
 - [x] Check desktop and mobile rendering and interactions.
-- [ ] Match the reference ring rotation across both scroll transitions and verify it in the preview.
+- [x] Match the reference ring rotation across both scroll transitions and verify it in the preview.
