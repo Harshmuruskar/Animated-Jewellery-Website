@@ -15,6 +15,12 @@ const diamondPink = new THREE.Color(0xf70db1);
 const metalSilver = new THREE.Color(0xfefefe);
 const metalRose = new THREE.Color(0xd28b8b);
 const metalGold = new THREE.Color(0xf7c478);
+// Keep the stones facing the viewer while the camera moves around the ring.
+const ringPose = {
+  hero: new THREE.Euler(0, 0, 0),
+  forever: new THREE.Euler(-.24, .38, -.18),
+  emotions: new THREE.Euler(.3, -.34, .32),
+};
 
 export default function RingScene() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -92,12 +98,14 @@ export default function RingScene() {
         if (window.innerWidth < 700) { t.x -= 1.12 * (1 - a); t.y += 1.5 * a * (1 - b); }
         camera.position.lerp(p, .055);
         target.lerp(t, .055);
-        // Reference pose: tilt forward and left in Forever, then roll clockwise
-        // as the ring lifts into Emotions. All three Euler axes animate together.
+        const ease = (value: number) => value * value * (3 - 2 * value);
+        const firstTurn = ease(a);
+        const secondTurn = ease(b);
+        const float = reduced ? 0 : Math.sin(performance.now() * .00055) * .018 * (1 - a);
         ring.rotation.set(
-          THREE.MathUtils.lerp(-Math.PI / 3 * a, .92, b),
-          THREE.MathUtils.lerp(-.92 * a, .92, b),
-          Math.PI / 3 * b,
+          THREE.MathUtils.lerp(THREE.MathUtils.lerp(ringPose.hero.x, ringPose.forever.x, firstTurn), ringPose.emotions.x, secondTurn),
+          THREE.MathUtils.lerp(THREE.MathUtils.lerp(ringPose.hero.y, ringPose.forever.y, firstTurn), ringPose.emotions.y, secondTurn) + float,
+          THREE.MathUtils.lerp(THREE.MathUtils.lerp(ringPose.hero.z, ringPose.forever.z, firstTurn), ringPose.emotions.z, secondTurn),
         );
         ring.traverse((object) => {
           if (!(object instanceof THREE.Mesh)) return;
