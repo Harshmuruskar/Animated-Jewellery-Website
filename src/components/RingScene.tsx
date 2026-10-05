@@ -18,8 +18,8 @@ const metalGold = new THREE.Color(0xf7c478);
 // Keep the stones facing the viewer while the camera moves around the ring.
 const ringPose = {
   hero: new THREE.Euler(0, 0, 0),
-  forever: new THREE.Euler(-.24, .38, -.18),
-  emotions: new THREE.Euler(.3, -.34, .32),
+  forever: new THREE.Euler(-.72, -.5, .1),
+  emotions: new THREE.Euler(.6, .52, .65),
 };
 
 export default function RingScene() {
