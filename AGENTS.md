@@ -11,3 +11,4 @@
 
 - Keep the reference ring as a hosted GLB pointer and the Draco decoder in public assets; this preserves the source geometry while avoiding a large binary in source control.
 - Keep the 3D scene client-only and coordinate its entrance and scroll camera movement with page controls; server rendering cannot create a WebGL context.
+- Keep Lovable AI Gateway prompts and calls in request-scoped server-only helpers, with typed callable wrappers separated into client-safe function modules, so credentials never enter the browser.
