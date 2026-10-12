@@ -2,3 +2,6 @@
 - [x] Match the reference’s scroll-driven camera transitions and controls.
 - [x] Check desktop and mobile rendering and interactions.
 - [x] Match the reference ring rotation across both scroll transitions and verify it in the preview.
+- [ ] Match the reference's scroll-linked ring, camera, section-copy, watermark, and navigation transitions; improve loading and night-mode behavior.
+- [ ] Add visitor controls to scrub the scroll position and request, review, and apply an AI-recommended smooth ring rotation curve; verify the AI response and preview flow.
+- [ ] Compare desktop and narrow-screen preview states against the reference and resolve all build/runtime issues.
