@@ -1,126 +1,328 @@
-import { useEffect, useRef } from 'react';
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import gsap from 'gsap';
-import ringAsset from '@/assets/ring_webgi.glb.asset.json';
+import { useEffect, useRef } from "react";
+import ringAsset from "@/assets/ring_webgi.glb.asset.json";
 
-const hero = { position: new THREE.Vector3(1.28, -1.7, 5.86), target: new THREE.Vector3(.91, .03, -.25) };
-const forever = { position: new THREE.Vector3(-1.83, -.14, 6.15), target: new THREE.Vector3(-.78, -.03, -.12) };
-const emotions = { position: new THREE.Vector3(-.06, -1.15, 4.42), target: new THREE.Vector3(-.01, .9, .07) };
-const diamondWhite = new THREE.Color(0xffffff);
-const diamondBlue = new THREE.Color(0x39cffe);
-const diamondPink = new THREE.Color(0xf70db1);
-const metalSilver = new THREE.Color(0xfefefe);
-const metalRose = new THREE.Color(0xd28b8b);
-const metalGold = new THREE.Color(0xf7c478);
-// Keep the stones facing the viewer while the camera moves around the ring.
-const ringPose = {
-  hero: new THREE.Euler(0, 0, 0),
-  forever: new THREE.Euler(-.72, -.5, .1),
-  emotions: new THREE.Euler(.6, .52, .65),
+type Vector = { x: number; y: number; z: number };
+type Color = {
+  lerpColors: (a: Color, b: Color, amount: number) => Color;
+  convertSRGBToLinear: () => Color;
+};
+type Ring = {
+  rotation: Vector & { set: (x: number, y: number, z: number) => void };
+  material: { color: Color };
+};
+type Controls = {
+  enabled: boolean;
+  autoRotate: boolean;
+  minDistance: number;
+  maxDistance: number;
+  enablePan: boolean;
+  screenSpacePanning: boolean;
+};
+type Camera = {
+  position: Vector;
+  target: Vector;
+  controls?: Controls;
+  setCameraOptions: (options: { fov: number }) => void;
+  positionUpdated: (value: boolean) => void;
+  targetUpdated: (value: boolean) => void;
+};
+type Pass = {
+  passObject: {
+    lowQualityFrames?: number;
+    stepCount: number;
+    material: { defines: Record<string, number> };
+  };
+};
+type Plugin = {
+  passes?: { ssr?: Pass; ssao?: Pass };
+  pass?: { passObject: { bloomIterations: number } };
+  enabled: boolean;
+};
+type Manager = {
+  importer: {
+    registerFile: (path: string) => {
+      setDecoderPath: (path: string) => void;
+      setDecoderConfig: (config: { type: string }) => void;
+    };
+    addEventListener: (
+      name: string,
+      callback: (event: { loaded: number; total: number }) => void,
+    ) => void;
+  };
+  addFromPath: (path: string) => Promise<unknown[]>;
+};
+type Viewer = {
+  scene: {
+    activeCamera: Camera;
+    findObjectsByName: (name: string) => Ring[];
+    removeSceneModels: () => void;
+  };
+  renderer: { displayCanvasScaling: number; refreshPipeline: () => void };
+  addPlugin: (plugin: unknown, ...args: unknown[]) => Promise<Plugin & Manager>;
+  setBackground: (color: Color) => void;
+  setDirty: () => void;
+  addEventListener: (name: string, callback: () => void) => void;
+  dispose: () => void;
+};
+type PluginName =
+  | "AssetManagerPlugin"
+  | "GBufferPlugin"
+  | "ProgressivePlugin"
+  | "TonemapPlugin"
+  | "SSRPlugin"
+  | "SSAOPlugin"
+  | "FrameFadePlugin"
+  | "GroundPlugin"
+  | "BloomPlugin"
+  | "TemporalAAPlugin"
+  | "DiamondPlugin"
+  | "RandomizedDirectionalLightPlugin";
+type Runtime = Record<PluginName, new (...args: unknown[]) => unknown> & {
+  ViewerApp: new (options: {
+    canvas: HTMLCanvasElement;
+    useGBufferDepth: boolean;
+    isAntialiased: boolean;
+  }) => Viewer;
+  Color: new (value: string | number) => Color;
 };
 
-export default function RingScene() {
+export type RingController = {
+  position: Vector;
+  target: Vector;
+  rotation: Vector;
+  colors: { forever: number; emotions: number };
+  update: () => void;
+  updateColors: () => void;
+  setNight: (night: boolean) => void;
+  setOrbit: (enabled: boolean) => void;
+  setGem: (color: string) => void;
+  setMetals: (silver: string, gold: string) => void;
+  changeModel: () => Promise<void>;
+};
+
+type Props = {
+  onReady: (controller: RingController) => void;
+  onProgress: (progress: number) => void;
+  onError: (message: string) => void;
+};
+
+// Pin the engine used by the reference. Loading it here keeps WebGL out of SSR.
+const runtimeUrl = "https://dist.pixotronics.com/webgi/runtime/bundle-0.4.6.mjs";
+const referenceModel = "https://webgi-jewelry.vercel.app/assets/ring_webgi.glb";
+
+export default function RingScene(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const callbacks = useRef(props);
+  callbacks.current = props;
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.55;
-    const scene = new THREE.Scene();
-    const environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04);
-    scene.environment = environment.texture;
-    const camera = new THREE.PerspectiveCamera(window.innerWidth < 700 ? 65 : window.innerWidth / window.innerHeight < 1.1 ? 44 : 25, 1, .01, 100);
-    camera.position.set(3, -.8, 1.2);
-    const target = new THREE.Vector3(2.5, -.07, -.1);
-    scene.add(new THREE.AmbientLight(0xffffff, 2.6));
-    const lights: [number, number, number, number, number][] = [
-      [-3, 6, 8, 0xffffff, 100], [4, 0, 6, 0xffd8ce, 80], [0, -4, -2, 0xffffff, 50], [-2, 2, -5, 0xffd49b, 65]
-    ];
-    lights.forEach(([x,y,z,color,intensity]) => { const light = new THREE.PointLight(color, intensity); light.position.set(x,y,z); scene.add(light); });
-    const draco = new DRACOLoader();
-    draco.setDecoderPath('/draco/');
-    const loader = new GLTFLoader();
-    loader.setDRACOLoader(draco);
-    let ring: THREE.Object3D | undefined;
     let disposed = false;
-    let intro: gsap.core.Timeline | undefined;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    loader.load(ringAsset.url, (gltf) => {
-      if (disposed) return;
-      ring = gltf.scene;
-      scene.add(ring);
-      window.dispatchEvent(new Event('jewelry-ready'));
-      ring.traverse((object) => {
-        if (!(object instanceof THREE.Mesh)) return;
-        const name = object.name.toLowerCase();
-        if (name.includes('diamond')) {
-          const material = new THREE.MeshPhysicalMaterial({ color: diamondWhite, metalness: .05, roughness: .055, clearcoat: 1, clearcoatRoughness: 0, envMapIntensity: 2, side: THREE.DoubleSide });
-          object.material = material;
-        } else if (name.includes('gold')) {
-          object.material = new THREE.MeshPhysicalMaterial({ color: 0xc7976f, metalness: .82, roughness: .12, clearcoat: 1, side: THREE.DoubleSide });
-        } else if (name.includes('silver')) {
-          object.material = new THREE.MeshPhysicalMaterial({ color: 0xd6c9d6, metalness: .82, roughness: .1, clearcoat: 1, side: THREE.DoubleSide });
-        }
-      });
-      intro = gsap.timeline();
-      intro.to(camera.position, { x: hero.position.x, y: hero.position.y, z: hero.position.z, duration: reduced ? .01 : 4, ease: 'power2.inOut' }, 0)
-        .to(target, { x: window.innerWidth < 700 ? -.21 : hero.target.x, y: hero.target.y, z: hero.target.z, duration: reduced ? .01 : 4, ease: 'power2.inOut' }, 0);
-    }, undefined, (error) => { console.error('Ring failed to load', error); window.dispatchEvent(new Event('jewelry-ready')); });
+    let viewer: Viewer | undefined;
 
-    function resize() {
-      const width = window.innerWidth; const height = window.innerHeight;
-      renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      camera.fov = width < 700 ? 65 : width / height < 1.1 ? 44 : 25;
-      camera.updateProjectionMatrix();
-    }
-    resize();
-    window.addEventListener('resize', resize);
-    let frame = 0;
-    let scroll = 0;
-    const onScroll = () => { scroll = window.scrollY / Math.max(window.innerHeight, 1); };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    function tick() {
-      frame = requestAnimationFrame(tick);
-      if (ring && (scroll > 0 || (intro && !intro.isActive()))) {
-        const a = THREE.MathUtils.clamp(scroll, 0, 1);
-        const b = THREE.MathUtils.clamp(scroll - 1, 0, 1);
-        const p = hero.position.clone().lerp(forever.position, a).lerp(emotions.position, b);
-        const t = hero.target.clone().lerp(forever.target, a).lerp(emotions.target, b);
-        if (window.innerWidth < 700) { t.x -= 1.12 * (1 - a); t.y += 1.5 * a * (1 - b); }
-        camera.position.lerp(p, .055);
-        target.lerp(t, .055);
-        const ease = (value: number) => value * value * (3 - 2 * value);
-        const firstTurn = ease(a);
-        const secondTurn = ease(b);
-        const float = reduced ? 0 : Math.sin(performance.now() * .00055) * .018 * (1 - a);
-        ring.rotation.set(
-          THREE.MathUtils.lerp(THREE.MathUtils.lerp(ringPose.hero.x, ringPose.forever.x, firstTurn), ringPose.emotions.x, secondTurn),
-          THREE.MathUtils.lerp(THREE.MathUtils.lerp(ringPose.hero.y, ringPose.forever.y, firstTurn), ringPose.emotions.y, secondTurn) + float,
-          THREE.MathUtils.lerp(THREE.MathUtils.lerp(ringPose.hero.z, ringPose.forever.z, firstTurn), ringPose.emotions.z, secondTurn),
-        );
-        ring.traverse((object) => {
-          if (!(object instanceof THREE.Mesh)) return;
-          const material = object.material;
-          if (!(material instanceof THREE.MeshPhysicalMaterial)) return;
-          const name = object.name.toLowerCase();
-          if (name.includes('diamond')) material.color.lerpColors(diamondWhite, diamondBlue, a).lerp(diamondPink, b);
-          else if (name.includes('gold') || name.includes('silver')) material.color.lerpColors(metalSilver, metalRose, a).lerp(metalGold, b);
-        });
+    async function setup() {
+      const runtime = (await import(/* @vite-ignore */ runtimeUrl)) as Runtime;
+      if (disposed) return;
+      viewer = new runtime.ViewerApp({
+        canvas: canvas!,
+        useGBufferDepth: true,
+        isAntialiased: false,
+      });
+      const instance = viewer;
+      instance.renderer.displayCanvasScaling = Math.min(window.devicePixelRatio, 1);
+      const manager = await instance.addPlugin(runtime.AssetManagerPlugin);
+      const decoder = manager.importer.registerFile("ring.drc");
+      decoder.setDecoderPath("/draco/");
+      decoder.setDecoderConfig({ type: "wasm" });
+      await instance.addPlugin(runtime.GBufferPlugin);
+      await instance.addPlugin(new runtime.ProgressivePlugin(32));
+      await instance.addPlugin(
+        new runtime.TonemapPlugin(true, false, [
+          "vec4 vignette(vec4 color, vec2 uv, float offset, float darkness) { uv = (uv - vec2(0.5)) * vec2(offset); return vec4(mix(color.rgb, vec3(0.17, 0.00, 0.09), dot(uv, uv)), color.a); }",
+          "gl_FragColor = vignette(gl_FragColor, vUv, 1.1, 0.8);",
+        ]),
+      );
+      const ssr = await instance.addPlugin(runtime.SSRPlugin);
+      const ssao = await instance.addPlugin(runtime.SSAOPlugin);
+      await instance.addPlugin(runtime.FrameFadePlugin);
+      await instance.addPlugin(runtime.GroundPlugin);
+      const bloom = await instance.addPlugin(runtime.BloomPlugin);
+      await instance.addPlugin(runtime.TemporalAAPlugin);
+      await instance.addPlugin(runtime.DiamondPlugin);
+      await instance.addPlugin(runtime.RandomizedDirectionalLightPlugin, false);
+      if (disposed) {
+        instance.dispose();
+        return;
       }
-      camera.lookAt(target);
-      renderer.render(scene, camera);
+
+      manager.importer.addEventListener("onProgress", (event) => {
+        if (!disposed && event.total > 0) callbacks.current.onProgress(event.loaded / event.total);
+      });
+      instance.renderer.refreshPipeline();
+      // Lovable serves the retained asset pointer; other hosts use the same source GLB.
+      const local = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+      const models = await manager.addFromPath(local ? referenceModel : ringAsset.url);
+      if (!models?.length && !local) await manager.addFromPath(referenceModel);
+      if (disposed) {
+        instance.dispose();
+        return;
+      }
+
+      let secondModel = false;
+      let customGem: string | undefined;
+      let customMetals: [string, string] | undefined;
+      let ring!: Ring;
+      let silver!: Ring;
+      let gold!: Ring;
+      let diamonds: Ring[];
+      function findMaterials() {
+        const ringObject = instance.scene.findObjectsByName(secondModel ? "Scene_1" : "Scene")[0];
+        const silverObject = instance.scene.findObjectsByName(
+          secondModel ? "alliance" : "silver",
+        )[0];
+        const goldObject = instance.scene.findObjectsByName(secondModel ? "entourage" : "gold")[0];
+        diamonds = (
+          secondModel
+            ? ["Object"]
+            : [
+                "diamonds",
+                "diamonds001",
+                "diamonds002",
+                "diamonds003",
+                "diamonds004",
+                "diamonds005",
+              ]
+        ).flatMap((name) => instance.scene.findObjectsByName(name));
+        if (!ringObject || !silverObject || !goldObject || !diamonds.length)
+          throw new Error("The ring model could not be loaded. Please try again.");
+        ring = ringObject;
+        silver = silverObject;
+        gold = goldObject;
+      }
+      findMaterials();
+      const camera = instance.scene.activeCamera;
+      const mobile = window.matchMedia("(max-width: 600px)").matches;
+      if (camera.controls) camera.controls.enabled = false;
+      if (mobile) {
+        camera.setCameraOptions({ fov: 65 });
+        bloom.enabled = false;
+      }
+      if (ssr.passes?.ssr) {
+        ssr.passes.ssr.passObject.lowQualityFrames = 0;
+        if (mobile) ssr.passes.ssr.passObject.stepCount /= 2;
+      }
+      if (bloom.pass) bloom.pass.passObject.bloomIterations = 2;
+      if (ssao.passes?.ssao) ssao.passes.ssao.passObject.material.defines["NUM_SAMPLES"] = 4;
+
+      const rotation = { x: ring.rotation.x, y: ring.rotation.y, z: ring.rotation.z };
+      const colors = { forever: 0, emotions: 0 };
+      const color = (value: string | number) => new runtime.Color(value).convertSRGBToLinear();
+      const white = color(0xffffff),
+        blue = color(0x39cffe),
+        pink = color(0xf70db1);
+      const silverColor = color(0xfefefe),
+        goldColor = color(0xe2bf7f),
+        rose = color(0xd28b8b),
+        warmGold = color(0xf7c478);
+      let needsUpdate = true;
+      const update = () => {
+        needsUpdate = true;
+        instance.setDirty();
+      };
+      const updateColors = () => {
+        // Like the reference, customization preserves the chosen look on return.
+        if (customGem || customMetals) {
+          update();
+          return;
+        }
+        if (!customGem)
+          for (const diamond of diamonds) {
+            diamond.material.color.lerpColors(white, blue, colors.forever);
+            if (colors.emotions > 0) diamond.material.color.lerpColors(blue, pink, colors.emotions);
+          }
+        if (!customMetals) {
+          silver.material.color.lerpColors(silverColor, rose, colors.forever);
+          gold.material.color.lerpColors(goldColor, rose, colors.forever);
+          if (colors.emotions > 0)
+            for (const metal of [silver, gold])
+              metal.material.color.lerpColors(rose, warmGold, colors.emotions);
+        }
+        update();
+      };
+      instance.addEventListener("preFrame", () => {
+        if (!needsUpdate || disposed) return;
+        ring.rotation.set(rotation.x, rotation.y, rotation.z);
+        camera.positionUpdated(false);
+        camera.targetUpdated(true);
+        needsUpdate = false;
+      });
+      instance.setBackground(color("#EEB7B5"));
+      callbacks.current.onProgress(1);
+      callbacks.current.onReady({
+        position: camera.position,
+        target: camera.target,
+        rotation,
+        colors,
+        update,
+        updateColors,
+        setNight: (night) => {
+          instance.setBackground(color(night ? "#22052f" : "#EEB7B5"));
+          update();
+        },
+        setOrbit: (enabled) => {
+          if (!camera.controls) return;
+          Object.assign(camera.controls, {
+            enabled,
+            autoRotate: enabled,
+            minDistance: enabled ? 5 : 0,
+            maxDistance: enabled ? 13 : Infinity,
+            enablePan: false,
+            screenSpacePanning: false,
+          });
+        },
+        setGem: (value) => {
+          customGem = value;
+          for (const diamond of diamonds) diamond.material.color = color(value);
+          update();
+        },
+        setMetals: (first, second) => {
+          customMetals = [first, second];
+          silver.material.color = color(first);
+          gold.material.color = color(second);
+          update();
+        },
+        changeModel: async () => {
+          instance.scene.removeSceneModels();
+          secondModel = !secondModel;
+          await manager.addFromPath(
+            `https://webgi-jewelry.vercel.app/assets/${secondModel ? "ring2_webgi" : "ring_webgi"}.glb`,
+          );
+          if (disposed) return;
+          findMaterials();
+          Object.assign(rotation, { x: secondModel ? 0 : -Math.PI / 2, y: 0, z: 0 });
+          if (customGem) for (const diamond of diamonds) diamond.material.color = color(customGem);
+          if (customMetals) {
+            silver.material.color = color(customMetals[0]);
+            gold.material.color = color(customMetals[1]);
+          }
+          update();
+        },
+      });
     }
-    tick();
-    return () => { disposed = true; cancelAnimationFrame(frame); intro?.kill(); window.removeEventListener('resize', resize); window.removeEventListener('scroll', onScroll); scene.traverse((object) => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); if (object.material instanceof THREE.Material) object.material.dispose(); } }); renderer.dispose(); draco.dispose(); };
+
+    setup().catch((error) => {
+      if (disposed) return;
+      console.error("Ring scene failed to load", error);
+      callbacks.current.onError(
+        "The 3D ring could not load. Please check your connection and try again.",
+      );
+    });
+    return () => {
+      disposed = true;
+      viewer?.dispose();
+    };
   }, []);
+
   return <canvas ref={canvasRef} className="jewelry-canvas" aria-label="Animated diamond ring" />;
 }

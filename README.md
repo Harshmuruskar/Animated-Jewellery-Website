@@ -22,3 +22,7 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+The 3D scene loads WebGi 0.4.6 from its hosted SDK to preserve the reference's diamond materials and lighting. Ring geometry stays hosted: Lovable uses the existing asset pointer, and local previews use the original reference GLB. The Draco decoder remains in `public/draco/`. An internet connection is required for the renderer, models, fonts, and soundtrack.
+
+The entrance waits for the model to load before starting the four-second camera move. Scroll controls unlock after the hero text enters; GSAP ScrollTrigger then coordinates the camera, ring rotation, material colors, and text at the actual section boundaries. Customization pauses scrolling and hands the camera to orbit controls; exiting restores the page animations.
