@@ -28,6 +28,9 @@ export function sampleRingRotation(curve: RingRotationCurve, progress: number): 
   const easedAmount = amount * amount * (3 - 2 * amount);
   const start = curve.keyframes[segment];
   const end = curve.keyframes[segment + 1];
+  if (!start || !end) {
+    throw new Error("Ring rotation curves must contain at least two valid keyframes.");
+  }
 
   return {
     x: start.x + (end.x - start.x) * easedAmount,

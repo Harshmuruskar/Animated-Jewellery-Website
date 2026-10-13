@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import ringAsset from "@/assets/ring_webgi.glb.asset.json";
+import { createRingRenderQuality } from "@/lib/ring-render-quality";
 
 type Vector = { x: number; y: number; z: number };
 type Color = {
@@ -12,11 +13,13 @@ type Ring = {
 };
 type Controls = {
   enabled: boolean;
+  enableDamping: boolean;
   autoRotate: boolean;
   minDistance: number;
   maxDistance: number;
   enablePan: boolean;
   screenSpacePanning: boolean;
+  update?: () => void;
 };
 type Camera = {
   position: Vector;
@@ -63,6 +66,7 @@ type Viewer = {
   setDirty: () => void;
   addEventListener: (name: string, callback: () => void) => void;
   dispose: () => void;
+  resize?: () => void;
 };
 type PluginName =
   | "AssetManagerPlugin"
@@ -104,6 +108,7 @@ type Props = {
   onReady: (controller: RingController) => void;
   onProgress: (progress: number) => void;
   onError: (message: string) => void;
+  interactive?: boolean;
 };
 
 // Pin the engine used by the reference. Loading it here keeps WebGL out of SSR.
@@ -112,6 +117,7 @@ const referenceModel = "https://webgi-jewelry.vercel.app/assets/ring_webgi.glb";
 
 export default function RingScene(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const currentController = useRef<RingController | null>(null);
   const callbacks = useRef(props);
   callbacks.current = props;
 
@@ -120,6 +126,8 @@ export default function RingScene(props: Props) {
     if (!canvas) return;
     let disposed = false;
     let viewer: Viewer | undefined;
+    let resizeObserver: ResizeObserver | undefined;
+    let resizeFrame = 0;
 
     async function setup() {
       const runtime = (await import(/* @vite-ignore */ runtimeUrl)) as Runtime;
@@ -130,7 +138,24 @@ export default function RingScene(props: Props) {
         isAntialiased: false,
       });
       const instance = viewer;
-      instance.renderer.displayCanvasScaling = Math.min(window.devicePixelRatio, 1);
+      const idleScale = Math.min(window.devicePixelRatio, 1);
+      instance.renderer.displayCanvasScaling = idleScale;
+      const renderQuality = createRingRenderQuality(idleScale, (scale) => {
+        instance.renderer.displayCanvasScaling = scale;
+        instance.setDirty();
+      });
+      // The same canvas changes dimensions when docking. Resize its render target,
+      // without recreating the viewer, materials, or decoded geometry.
+      resizeObserver = new ResizeObserver(([entry]) => {
+        if (entry) renderQuality.resize(entry.contentRect.width, entry.contentRect.height);
+        cancelAnimationFrame(resizeFrame);
+        resizeFrame = requestAnimationFrame(() => {
+          if (disposed) return;
+          instance.resize?.();
+          instance.setDirty();
+        });
+      });
+      resizeObserver.observe(canvas!);
       const manager = await instance.addPlugin(runtime.AssetManagerPlugin);
       const decoder = manager.importer.registerFile("ring.drc");
       decoder.setDecoderPath("/draco/");
@@ -145,7 +170,7 @@ export default function RingScene(props: Props) {
       );
       const ssr = await instance.addPlugin(runtime.SSRPlugin);
       const ssao = await instance.addPlugin(runtime.SSAOPlugin);
-      await instance.addPlugin(runtime.FrameFadePlugin);
+      const frameFade = await instance.addPlugin(runtime.FrameFadePlugin);
       await instance.addPlugin(runtime.GroundPlugin);
       const bloom = await instance.addPlugin(runtime.BloomPlugin);
       await instance.addPlugin(runtime.TemporalAAPlugin);
@@ -201,6 +226,15 @@ export default function RingScene(props: Props) {
         gold = goldObject;
       }
       findMaterials();
+      // The imported GLB can restore plugin settings; apply these after import.
+      // GSAP already interpolates camera/material changes. A second frame fade
+      // makes the ring trail behind the scroll position and adds another pass.
+      const configureMotionRendering = () => {
+        frameFade.enabled = false;
+        if (ssr.passes?.ssr) ssr.passes.ssr.passObject.lowQualityFrames = 2;
+        renderQuality.invalidate();
+      };
+      configureMotionRendering();
       const camera = instance.scene.activeCamera;
       const mobile = window.matchMedia("(max-width: 600px)").matches;
       if (camera.controls) camera.controls.enabled = false;
@@ -209,7 +243,7 @@ export default function RingScene(props: Props) {
         bloom.enabled = false;
       }
       if (ssr.passes?.ssr) {
-        ssr.passes.ssr.passObject.lowQualityFrames = 0;
+        // The motion setting halves reflection steps until rendering settles.
         if (mobile) ssr.passes.ssr.passObject.stepCount /= 2;
       }
       if (bloom.pass) bloom.pass.passObject.bloomIterations = 2;
@@ -228,6 +262,7 @@ export default function RingScene(props: Props) {
       let needsUpdate = true;
       const update = () => {
         needsUpdate = true;
+        renderQuality.markMovement(performance.now());
         instance.setDirty();
       };
       const updateColors = () => {
@@ -251,6 +286,8 @@ export default function RingScene(props: Props) {
         update();
       };
       instance.addEventListener("preFrame", () => {
+        if (disposed) return;
+        renderQuality.frame(performance.now());
         if (!needsUpdate || disposed) return;
         ring.rotation.set(rotation.x, rotation.y, rotation.z);
         camera.positionUpdated(false);
@@ -259,7 +296,7 @@ export default function RingScene(props: Props) {
       });
       instance.setBackground(color("#EEB7B5"));
       callbacks.current.onProgress(1);
-      callbacks.current.onReady({
+      const controller: RingController = {
         position: camera.position,
         target: camera.target,
         rotation,
@@ -272,14 +309,18 @@ export default function RingScene(props: Props) {
         },
         setOrbit: (enabled) => {
           if (!camera.controls) return;
+          renderQuality.setContinuous(enabled, performance.now());
           Object.assign(camera.controls, {
             enabled,
+            enableDamping: enabled,
             autoRotate: enabled,
             minDistance: enabled ? 5 : 0,
             maxDistance: enabled ? 13 : Infinity,
             enablePan: false,
             screenSpacePanning: false,
           });
+          // Clear residual orbit movement before GSAP takes ownership of the camera.
+          if (!enabled) camera.controls.update?.();
         },
         setGem: (value) => {
           customGem = value;
@@ -300,6 +341,7 @@ export default function RingScene(props: Props) {
           );
           if (disposed) return;
           findMaterials();
+          configureMotionRendering();
           Object.assign(rotation, { x: secondModel ? 0 : -Math.PI / 2, y: 0, z: 0 });
           if (customGem) for (const diamond of diamonds) diamond.material.color = color(customGem);
           if (customMetals) {
@@ -308,7 +350,9 @@ export default function RingScene(props: Props) {
           }
           update();
         },
-      });
+      };
+      currentController.current = controller;
+      callbacks.current.onReady(controller);
     }
 
     setup().catch((error) => {
@@ -320,9 +364,32 @@ export default function RingScene(props: Props) {
     });
     return () => {
       disposed = true;
+      resizeObserver?.disconnect();
+      cancelAnimationFrame(resizeFrame);
+      currentController.current = null;
       viewer?.dispose();
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="jewelry-canvas" aria-label="Animated diamond ring" />;
+  return (
+    <canvas
+      ref={canvasRef}
+      className="jewelry-canvas"
+      aria-label="Live 3D ring. Drag to rotate, or use arrow keys when focused."
+      tabIndex={props.interactive ? 0 : -1}
+      onKeyDown={(event) => {
+        if (
+          !props.interactive ||
+          !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
+        )
+          return;
+        event.preventDefault();
+        const controller = currentController.current;
+        if (!controller) return;
+        controller.rotation[event.key === "ArrowLeft" || event.key === "ArrowRight" ? "z" : "x"] +=
+          event.key === "ArrowLeft" || event.key === "ArrowUp" ? -0.15 : 0.15;
+        controller.update();
+      }}
+    />
+  );
 }

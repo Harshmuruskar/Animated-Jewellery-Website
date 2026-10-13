@@ -1,78 +1,35 @@
 import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Lenis from "lenis";
 
-// Match the reference's 2.2-second Lenis wheel easing without another render loop.
 export function createJewelryScroll(reducedMotion: boolean) {
-  let enabled = false;
-  let target = window.scrollY;
-  let tween: gsap.core.Tween | undefined;
-  const position = { y: target };
-  const maxScroll = () => Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-
-  function scrollTo(top: number) {
-    tween?.kill();
-    target = Math.max(0, Math.min(top, maxScroll()));
-    position.y = window.scrollY;
-    if (reducedMotion) {
-      window.scrollTo(0, target);
-      return;
-    }
-    tween = gsap.to(position, {
-      y: target,
-      duration: 2.2,
-      ease: (time: number) => (time === 1 ? 1 : Math.min(1, 1.001 - 2 ** (-5 * time))),
-      onUpdate: () => window.scrollTo(0, position.y),
-      onComplete: () => {
-        window.scrollTo(0, target);
-        position.y = target;
-      },
-    });
-  }
-
-  function wheel(event: WheelEvent) {
-    if (
-      !enabled ||
-      reducedMotion ||
-      event.ctrlKey ||
-      event.metaKey ||
-      Math.abs(event.deltaX) > Math.abs(event.deltaY)
-    )
-      return;
-    if (window.matchMedia("(max-width: 600px)").matches) return;
-    event.preventDefault();
-    const delta =
-      event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1);
-    scrollTo(target + delta);
-  }
-  function sync() {
-    if (!tween?.isActive()) target = window.scrollY;
-  }
-  function cancel() {
-    tween?.kill();
-    target = window.scrollY;
-  }
-  window.addEventListener("wheel", wheel, { passive: false });
-  window.addEventListener("scroll", sync, { passive: true });
-  window.addEventListener("touchstart", cancel, { passive: true });
-  window.addEventListener("pointerdown", cancel, { passive: true });
-  window.addEventListener("keydown", cancel);
+  gsap.registerPlugin(ScrollTrigger);
+  const lenis = new Lenis({
+    autoRaf: false,
+    lerp: 0.16,
+    smoothWheel: !reducedMotion,
+    syncTouch: false,
+  });
+  // Page controls decide when browsing starts and pause it for customization or dialogs.
+  lenis.stop();
+  lenis.on("scroll", ScrollTrigger.update);
+  const tick = (time: number) => lenis.raf(time * 1000);
+  // Advance scrolling before GSAP renders, keeping the camera and copy on the same frame.
+  gsap.ticker.add(tick, false, true);
+  gsap.ticker.lagSmoothing(0);
 
   return {
-    scrollTo,
+    scrollTo: (top: number | HTMLElement) =>
+      lenis.scrollTo(top, { immediate: reducedMotion || lenis.prefersReducedMotion }),
     start: () => {
-      enabled = true;
-      target = window.scrollY;
+      lenis.resize();
+      lenis.start();
     },
-    stop: () => {
-      enabled = false;
-      cancel();
-    },
+    stop: () => lenis.stop(),
     destroy: () => {
-      cancel();
-      window.removeEventListener("wheel", wheel);
-      window.removeEventListener("scroll", sync);
-      window.removeEventListener("touchstart", cancel);
-      window.removeEventListener("pointerdown", cancel);
-      window.removeEventListener("keydown", cancel);
+      gsap.ticker.remove(tick);
+      lenis.off("scroll", ScrollTrigger.update);
+      lenis.destroy();
     },
   };
 }
